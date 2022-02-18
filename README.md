@@ -1,0 +1,2 @@
+# slackvpn
+Slackware openvpn install
