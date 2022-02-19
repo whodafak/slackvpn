@@ -263,8 +263,7 @@ group $group_name
 persist-key
 persist-tun
 verb 3
-crl-verify crl.pem
-daemon" >> /etc/openvpn/server.conf
+crl-verify crl.pem" >> /etc/openvpn/server.conf
 	if [[ "$protocol" = "udp" ]]; then
 		echo "explicit-exit-notify" >> /etc/openvpn/server.conf
 	fi
