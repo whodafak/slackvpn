@@ -303,7 +303,7 @@ ip6tables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
                 echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.d/rc.local
         fi
 	if ! grep -q "ip6tables-restore < /etc/iptables/rules.v6" "/etc/rc.d/rc.local"; then
-        echo "ip6tables-restore < /etc/iptables/rules.v6" >> /etc/rc.d/rc.local
+                echo "ip6tables-restore < /etc/iptables/rules.v6" >> /etc/rc.d/rc.local
         fi
 	# If the server is behind NAT, use the correct IP address
 	[[ -n "$public_ip" ]] && ip="$public_ip"
@@ -438,7 +438,7 @@ iptables -D FORWARD -s 10.8.0.0/24 -j ACCEPT
 iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables-save > /etc/iptables/rules.v4
                        if grep -q "iptables-restore < /etc/iptables/rules.v4" "/etc/rc.d/rc.local"; then
-                       echo "$(grep -v "iptables-restore < /etc/iptables/rules.v6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+                       echo "$(grep -v "iptables-restore < /etc/iptables/rules.v4" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
                        fi
                        if grep -q "echo 1 > /proc/sys/net/ipv4/ip_forward" "/etc/rc.d/rc.local"; then
                        echo "$(grep -v "echo 1 > /proc/sys/net/ipv4/ip_forward" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
@@ -459,8 +459,7 @@ ip6tables-save > /etc/iptables/rules.v6
 			removepkg openvpn
 			rm -rf /etc/openvpn
 			rm -rf /usr/share/doc/openvpn*
-			rm -rf /tmp/iptables*
-	               	echo
+			      	echo
 				echo "OpenVPN removed!"
 			else
 				echo
