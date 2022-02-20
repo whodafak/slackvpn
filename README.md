@@ -15,7 +15,7 @@ Currently tested and working on Slackware 15.0
 # Iptables
 
 If you have iptables rules before you run the script it will autosave them, append new rules for openvpn and load them on every boot.                               
-If you want to add more rules after you install the script, simply edit /etc/openvpn/iptables for v4 and /etc/openvpn/iptables6 for v6, append new rules there and restore them with 
+If you want to add more rules after you install the script, simply edit /etc/iptables/rules.v4 for ipv4 and /etc/iptables/rules.v6 for ipv6, append new rules there and restore them with 
 
-  - iptables-restore < /etc/openvpn/iptables for v4                                                                                                             
-  - ip6tables-restore < /etc/openvpn/iptables6 for v6
+  - iptables-restore < /etc/iptables/rules.v4 for v4                                                                                                             
+  - ip6tables-restore < /etc/iptables/rules.v6 for v6
