@@ -19,3 +19,7 @@ If you want to add more rules after you install the script, simply edit /etc/ipt
 
   - iptables-restore < /etc/iptables/rules.v4 for v4                                                                                                             
   - ip6tables-restore < /etc/iptables/rules.v6 for v6
+
+# Donations
+
+If you find this usefull please donate to [Nyr](https://github.com/Nyr/openvpn-install) Or [Slackware](https://www.patreon.com/slackwarelinux/overview) . Thank You
