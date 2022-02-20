@@ -2,7 +2,8 @@
 #
 # https://github.com/whodafak/slackvpn
 #
-# Thanks to Nyr (If you want to buy him coffe https://www.paypal.com/donate/?cmd=_s-xclick&hosted_button_id=VBAYDL34Z7J6L ) for this great script. Here is slackware version. Currently tested and working on # Slackware 15.0. Big thanks to Slackware team.. please if you find this scipt usefull consider donating to slackware project at : http://arm.slackware.com/sponsor/ 
+# Thanks to Nyr (If you want to buy him coffe https://www.paypal.com/donate/?cmd=_s-xclick&hosted_button_id=VBAYDL34Z7J6L ) for this great script. Here is slackware version. Currently tested and working on 
+# Slackware 15.0. Big thanks to Slackware team.. please if you find this scipt usefull consider donating to slackware project at : http://arm.slackware.com/sponsor/ 
 # you can Donate directly to Patrick Volkerding (Supporting x86 Slackware)  or Stuart Winter (Supporting ARM / AArch64 Slackware)
 
 
