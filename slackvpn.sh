@@ -316,7 +316,7 @@ persist-tun
 remote-cert-tls server
 auth SHA512
 cipher AES-256-CBC
-data-ciphers AES-256-CBC
+#data-ciphers AES-256-CBC #Enable this if you are using 2.5 version or higher
 ignore-unknown-option block-outside-dns
 block-outside-dns
 verb 3" > /etc/openvpn/client-common.txt
