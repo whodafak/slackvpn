@@ -196,7 +196,7 @@ if [[ ! -e /etc/openvpn/server.conf ]]; then
 	# Without +x in the directory, OpenVPN can't run a stat() on the CRL file
 	chmod o+x /etc/openvpn/
 	# Generate key for tls-crypt
-	openvpn --genkey --secret /etc/openvpn/tc.key
+	openvpn --genkey secret /etc/openvpn/tc.key
 	# Create the DH parameters file using the predefined ffdhe2048 group
 	echo '-----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEAquPY/dyCUaxh2CQgMh9KwR/4UcuNU1HDqfsp5/+GNlGk0SVfUmf2
@@ -211,12 +211,12 @@ rBhjPYuNE2bc7qEe6xYrtaTIht/LdNlg+wIBAg==
 port $port
 proto $protocol
 dev tun
-ca ca.crt
-cert server.crt
-key server.key
-dh dh.pem
+ca /etc/openvpn/ca.crt
+cert /etc/openvpn/server.crt
+key /etc/openvpn/server.key
+dh /etc/openvpn/dh.pem
 auth SHA512
-tls-crypt tc.key
+tls-crypt /etc/openvpn/tc.key
 topology subnet
 server 10.8.0.0 255.255.255.0" > /etc/openvpn/server.conf
 	# IPv6
@@ -258,12 +258,13 @@ server 10.8.0.0 255.255.255.0" > /etc/openvpn/server.conf
 	esac
 	echo "keepalive 10 120
 cipher AES-256-CBC
+data-ciphers AES-256-CBC
 user nobody
 group $group_name
 persist-key
 persist-tun
 verb 3
-crl-verify crl.pem" >> /etc/openvpn/server.conf
+crl-verify /etc/openvpn/crl.pem" >> /etc/openvpn/server.conf
 	if [[ "$protocol" = "udp" ]]; then
 		echo "explicit-exit-notify" >> /etc/openvpn/server.conf
 	fi
@@ -281,31 +282,17 @@ crl-verify crl.pem" >> /etc/openvpn/server.conf
 		# Enable without waiting for a reboot or service restart
 		echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
 	fi
-                # Create a persistent iptables rules
-                iptables_path=$(command -v iptables)
-                ip6tables_path=$(command -v ip6tables)
-                # bles is not available as standard in OVZ kernels. So use iptables-legacy
-                # if we are in OVZ, with a nf_tables backend and iptables-legacy is available.
-                if readlink -f "$(command -v iptables)" | grep -q "nft" && hash iptables-legacy 2>/dev/null; then
-                        iptables_path=$(command -v iptables-legacy)
-                        ip6tables_path=$(command -v ip6tables-legacy)
-                fi
-                echo "
-$iptables_path -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
-$iptables_path -I INPUT -p $protocol --dport $port -j ACCEPT
-$iptables_path -I FORWARD -s 10.8.0.0/24 -j ACCEPT
-$iptables_path -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" > /tmp/iptables-save
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
+iptables -I INPUT -p $protocol --dport $port -j ACCEPT
+iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT
+iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
                 if [[ -n "$ip6" ]]; then
-                        echo "
-$ip6tables_path -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
-$ip6tables_path -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
-$ip6tables_path -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" >> /tmp/iptables6-save
+ip6tables -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
+ip6tables -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
+ip6tables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
                 fi
-        #Add them to iptables format and load them to openvpn folder
-        bash /tmp/iptables-save
         iptables-save > /etc/openvpn/iptables
         if [[ -n "$ip6" ]]; then
-        bash /tmp/iptables6-save
         ip6tables-save > /etc/openvpn/iptables6
         fi
         # Load them on boot time.
@@ -329,21 +316,23 @@ persist-tun
 remote-cert-tls server
 auth SHA512
 cipher AES-256-CBC
+data-ciphers AES-256-CBC
 ignore-unknown-option block-outside-dns
 block-outside-dns
 verb 3" > /etc/openvpn/client-common.txt
-        #Enable and restart OpenVPN
+        #Enable and start OpenVPN script is bugged.. so we need to do start/stop/start
         if [[ -e /etc/rc.d/rc.openvpn ]]; then
 		if [ -x /etc/rc.d/rc.openvpn ]; then
-        	        /etc/rc.d/rc.openvpn restart
-		else
-			chmod +x /etc/rc.d/rc.openvpn ; /etc/rc.d/rc.openvpn start
+        	        /etc/rc.d/rc.openvpn start
+       	else
+			chmod +x /etc/rc.d/rc.openvpn
+			/etc/rc.d/rc.openvpn start
 		fi
 	else
 		# This is for older versions of Slackware. Kill openvpn if it is running
 		/usr/bin/killall openvpn
 		# Start openvpn
-		/usr/sbin/openvpn /etc/openvpn/server.conf
+		/usr/sbin/openvpn --daemon --writepid /run/openvpn/server.conf.pid --user nobody --group nobody --config /etc/openvpn/server.conf
 		# Print a message telling the user that rc.openvpn needs to be created
 		echo /etc/rc.d/rc.openvpn was not found, you must create one and modify
 		echo /etc/rc.d/rc.local in order for OpenVPN to start automatically on reboot!
@@ -438,40 +427,37 @@ else
 			if [[ "$remove" =~ ^[yY]$ ]]; then
 				port=$(grep '^port ' /etc/openvpn/server.conf | cut -d " " -f 2)
 				protocol=$(grep '^proto ' /etc/openvpn/server.conf | cut -d " " -f 2)
-				echo "
-$iptables_path -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
-$iptables_path -D INPUT -p $protocol --dport $port -j ACCEPT
-$iptables_path -D FORWARD -s 10.8.0.0/24 -j ACCEPT
-$iptables_path -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" > /tmp/iptables-save
-                if [[ -n "$ip6" ]]; then
-                        echo "
-$ip6tables_path -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
-$ip6tables_path -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
-$ip6tables_path -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" >> /tmp/iptables6-save
-                fi
-        #Add them to iptables format then delete them
-        bash /tmp/iptables-save
-        iptables-save > /etc/openvpn/iptables
-        if [[ -n "$ip6" ]]; then
-        bash /tmp/iptables6-save
-        ip6tables-save > /etc/openvpn/iptables6
-        fi
-	rm -rf /tmp/iptables*
-        rm -rf /etc/openvpn/iptables*
-        # Unload them on boot time.
-        if ! grep -q "iptables-restore < /etc/openvpn/iptables" "/etc/rc.d/rc.local"; then
-             echo "$(grep -v "iptables-restore < /etc/openvpn/iptables" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
-        fi
-	if ! grep -q "ip6tables-restore < /etc/openvpn/iptables6" "/etc/rc.d/rc.local"; then
-             echo "$(grep -v "iptables-restore < /etc/openvpn/iptables" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
-        fi
-				if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
-					semanage port -d -t openvpn_port_t -p "$protocol" "$port"
-				fi
-				        removepkg openvpn
-				        rm -rf /etc/openvpn
-				        rm -rf /usr/share/doc/openvpn*
-				echo
+				ip=$(grep '^local ' /etc/openvpn/server.conf | cut -d " " -f 2)
+				ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}')
+iptables -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
+iptables -D INPUT -p $protocol --dport $port -j ACCEPT
+iptables -D FORWARD -s 10.8.0.0/24 -j ACCEPT
+iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables-save > /etc/openvpn/iptables
+                       if grep -q "iptables-restore < /etc/openvpn/iptables" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "iptables-restore < /etc/openvpn/iptables" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+                       fi
+                       if grep -q "echo 1 > /proc/sys/net/ipv4/ip_forward" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "echo 1 > /proc/sys/net/ipv4/ip_forward" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+                       fi
+                       if [[ -n "$ip6" ]]; then
+ip6tables -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
+ip6tables -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
+ip6tables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+ip6tables-save > /etc/openvpn/iptables6
+                       if grep -q "ip6tables-restore < /etc/openvpn/iptables6" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "ip6tables-restore < /etc/openvpn/iptables6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+                       fi
+                       if grep -q "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+                       fi
+                       fi
+		 	/etc/rc.d/rc.openvpn stop
+			removepkg openvpn
+			rm -rf /etc/openvpn
+			rm -rf /usr/share/doc/openvpn*
+			rm -rf /tmp/iptables*
+	               	echo
 				echo "OpenVPN removed!"
 			else
 				echo
