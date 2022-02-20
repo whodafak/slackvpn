@@ -9,12 +9,14 @@
 # Detect OS
 # $os_version variables aren't always in use, but are kept here for convenience
 if [[ -e /etc/slackware-version ]]; then
-	group_name=nobody
-	RCLOCAL='/etc/rc.d/rc.local'
-	chmod +x $RCLOCAL
+        if [[ -e /etc/rc.d/rc.local || -x /etc/rc.d/rc.local ]]; then
+        rclocal='/etc/rc.d/rc.local'
+        chmod +x $rclocal
+        group_name=nobody
+        fi
 else
-	echo "Who is the oldest linux system and why you are not using it?"
-	exit
+        echo "Who is the oldest linux system and why you are not using it?"
+        exit
 fi
 if [[ "$EUID" -ne 0 ]]; then
 	echo "This installer needs to be run with superuser privileges."
@@ -320,7 +322,7 @@ cipher AES-256-CBC
 ignore-unknown-option block-outside-dns
 block-outside-dns
 verb 3" > /etc/openvpn/client-common.txt
-        #Enable and start OpenVPN script is bugged.. so we need to do start/stop/start
+        #Enable and start OpenVPN
         if [[ -e /etc/rc.d/rc.openvpn ]]; then
 		if [ -x /etc/rc.d/rc.openvpn ]; then
         	        /etc/rc.d/rc.openvpn start
