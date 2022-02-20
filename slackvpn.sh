@@ -182,6 +182,7 @@ if [[ ! -e /etc/openvpn/server.conf ]]; then
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz'
 	mkdir -p /etc/openvpn/easy-rsa/
 	mkdir -p /etc/openvpn/ccd/
+	mkdir -p /etc/iptables/
 	{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -sL "$easy_rsa_url" ; } | tar xz -C /etc/openvpn/easy-rsa/ --strip-components 1
 	chown -R root:root /etc/openvpn/easy-rsa/
 	cd /etc/openvpn/easy-rsa/
@@ -293,16 +294,16 @@ ip6tables -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:
 ip6tables -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 ip6tables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
                 fi
-        iptables-save > /etc/openvpn/iptables
+        iptables-save > /etc/iptables/rules.v4
         if [[ -n "$ip6" ]]; then
-        ip6tables-save > /etc/openvpn/iptables6
+        ip6tables-save > /etc/iptables/rules.v6
         fi
         # Load them on boot time.
-        if ! grep -q "iptables-restore < /etc/openvpn/iptables" "/etc/rc.d/rc.local"; then
-                echo "iptables-restore < /etc/openvpn/iptables" >> /etc/rc.d/rc.local
+        if ! grep -q "iptables-restore < /etc/iptables/rules.v4" "/etc/rc.d/rc.local"; then
+                echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.d/rc.local
         fi
-	if ! grep -q "ip6tables-restore < /etc/openvpn/iptables6" "/etc/rc.d/rc.local"; then
-        echo "ip6tables-restore < /etc/openvpn/iptables6" >> /etc/rc.d/rc.local
+	if ! grep -q "ip6tables-restore < /etc/iptables/rules.v6" "/etc/rc.d/rc.local"; then
+        echo "ip6tables-restore < /etc/iptables/rules.v6" >> /etc/rc.d/rc.local
         fi
 	# If the server is behind NAT, use the correct IP address
 	[[ -n "$public_ip" ]] && ip="$public_ip"
@@ -435,9 +436,9 @@ iptables -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
 iptables -D INPUT -p $protocol --dport $port -j ACCEPT
 iptables -D FORWARD -s 10.8.0.0/24 -j ACCEPT
 iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables-save > /etc/openvpn/iptables
-                       if grep -q "iptables-restore < /etc/openvpn/iptables" "/etc/rc.d/rc.local"; then
-                       echo "$(grep -v "iptables-restore < /etc/openvpn/iptables" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+iptables-save > /etc/iptables/rules.v4
+                       if grep -q "iptables-restore < /etc/iptables/rules.v4" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "iptables-restore < /etc/iptables/rules.v6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
                        fi
                        if grep -q "echo 1 > /proc/sys/net/ipv4/ip_forward" "/etc/rc.d/rc.local"; then
                        echo "$(grep -v "echo 1 > /proc/sys/net/ipv4/ip_forward" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
@@ -446,9 +447,9 @@ iptables-save > /etc/openvpn/iptables
 ip6tables -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
 ip6tables -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 ip6tables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-ip6tables-save > /etc/openvpn/iptables6
-                       if grep -q "ip6tables-restore < /etc/openvpn/iptables6" "/etc/rc.d/rc.local"; then
-                       echo "$(grep -v "ip6tables-restore < /etc/openvpn/iptables6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+ip6tables-save > /etc/iptables/rules.v6
+                       if grep -q "ip6tables-restore < /etc/iptables/rules.v6" "/etc/rc.d/rc.local"; then
+                       echo "$(grep -v "ip6tables-restore < /etc/iptables/rules.v6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
                        fi
                        if grep -q "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" "/etc/rc.d/rc.local"; then
                        echo "$(grep -v "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
