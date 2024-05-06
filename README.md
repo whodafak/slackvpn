@@ -10,7 +10,7 @@ Currently tested and working on Slackware 15.0
    
    And follow the screen.
    
-   After finish, you can run it again to add/remove users or uninstall OpenVPN
+   When done, you can run it again to add/remove users or uninstall OpenVPN
 
 # Iptables
 
@@ -22,4 +22,4 @@ If you want to add more rules after you install the script, simply edit /etc/ipt
 
 # Donations
 
-If you find this usefull please donate to [Nyr](https://github.com/Nyr/openvpn-install) Or [Slackware](https://www.patreon.com/slackwarelinux/overview) . Thank You
+If you find this useful please donate to [Nyr](https://github.com/Nyr/openvpn-install) Or [Slackware](https://www.patreon.com/slackwarelinux/overview) . Thank You
