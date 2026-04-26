@@ -4,17 +4,20 @@ OpenVPN and Wireguard installer for Slackware based on Nyr's OpenVPN road warrio
 Currently tested and working on Slackware 15.0
 
 # How to Install
-    * as root
+as root
 
-    - If you want only OpenVPN (this one is AI free)
-    - wget https://raw.githubusercontent.com/whodafak/slackvpn/main/slackvpn.sh
-    - bash slackvpn.sh
-    
-    - If you want + wireguard (this one have AI code in it) :
-    - wget https://raw.githubusercontent.com/whodafak/slackvpn/main/slackwirevpn.sh
-    - bash slackwirevpn.sh
-   
-   And follow the screen.
+ If you want only OpenVPN (this one is AI free)
+
+- wget https://raw.githubusercontent.com/whodafak/slackvpn/main/slackvpn.sh
+- bash slackvpn.sh
+
+ If you want + wireguard (this one have AI code in it) 
+
+- wget https://raw.githubusercontent.com/whodafak/slackvpn/main/slackwirevpn.sh
+- bash slackwirevpn.sh
+
+
+And follow the screen.
    
    When script is done, you can run it again to add/remove users or uninstall OpenVPN / WireGuard
 
