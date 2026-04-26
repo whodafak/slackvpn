@@ -80,20 +80,34 @@ new_wg_client () {
 	done
 	wg_client_ip="10.9.0.$octet"
 
+	# Assign an IPv6 client address if the server has IPv6
+	if grep -q 'fddd:9090:9090:9090' /etc/wireguard/wg0.conf 2>/dev/null; then
+		# Find next available IPv6 octet matching the IPv4 octet
+		wg_client_ip6="fddd:9090:9090:9090::$octet"
+		wg_client_allowed="$wg_client_ip/32, $wg_client_ip6/128"
+		wg_client_addr="$wg_client_ip/32, $wg_client_ip6/128"
+		wg_client_routes="0.0.0.0/0, ::/0"
+	else
+		wg_client_ip6=""
+		wg_client_allowed="$wg_client_ip/32"
+		wg_client_addr="$wg_client_ip/32"
+		wg_client_routes="0.0.0.0/0"
+	fi
+
 	# Append peer to server config
 	echo "
 [Peer]
 # $wg_client
 PublicKey = $wg_client_public
 PresharedKey = $wg_client_psk
-AllowedIPs = $wg_client_ip/32" >> /etc/wireguard/wg0.conf
+AllowedIPs = $wg_client_allowed" >> /etc/wireguard/wg0.conf
 
 	# Reload WireGuard to pick up new peer (non-disruptive)
 	if wg show wg0 &>/dev/null; then
 		wg addconf wg0 <(echo "[Peer]
 PublicKey = $wg_client_public
 PresharedKey = $wg_client_psk
-AllowedIPs = $wg_client_ip/32")
+AllowedIPs = $wg_client_allowed")
 	fi
 
 	# Determine DNS to push in client config
@@ -115,7 +129,7 @@ AllowedIPs = $wg_client_ip/32")
 	# Generate client config file
 	cat > ~/"$wg_client".conf << EOF
 [Interface]
-Address = $wg_client_ip/32
+Address = $wg_client_addr
 DNS = $wg_dns_line
 PrivateKey = $wg_client_private
 
@@ -123,7 +137,7 @@ PrivateKey = $wg_client_private
 PublicKey = $wg_server_public
 PresharedKey = $wg_client_psk
 Endpoint = $wg_endpoint_ip:$wg_port
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = $wg_client_routes
 PersistentKeepalive = 25
 EOF
 }
@@ -626,6 +640,25 @@ elif [[ "$vpn_choice" -eq 2 ]]; then
 			[[ -z "$public_ip" ]] && public_ip="$get_public_ip"
 		fi
 
+		# If system has a single IPv6, it is selected automatically
+		if [[ $(ip -6 addr | grep -c 'inet6 [23]') -eq 1 ]]; then
+			ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}')
+		fi
+		# If system has multiple IPv6, ask the user to select one
+		if [[ $(ip -6 addr | grep -c 'inet6 [23]') -gt 1 ]]; then
+			number_of_ip6=$(ip -6 addr | grep -c 'inet6 [23]')
+			echo
+			echo "Which IPv6 address should be used?"
+			ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | nl -s ') '
+			read -p "IPv6 address [1]: " ip6_number
+			until [[ -z "$ip6_number" || "$ip6_number" =~ ^[0-9]+$ && "$ip6_number" -le "$number_of_ip6" ]]; do
+				echo "$ip6_number: invalid selection."
+				read -p "IPv6 address [1]: " ip6_number
+			done
+			[[ -z "$ip6_number" ]] && ip6_number="1"
+			ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)
+		fi
+
 		echo
 		echo "What port should WireGuard listen to?"
 		read -p "Port [51820]: " wg_port
@@ -695,14 +728,25 @@ elif [[ "$vpn_choice" -eq 2 ]]; then
 		# Store endpoint for client config generation
 		[[ -n "$public_ip" ]] && wg_endpoint="$public_ip" || wg_endpoint="$ip"
 
+		# Build IPv6 address line and ip6tables rules if IPv6 is available
+		if [[ -n "$ip6" ]]; then
+			wg_addr_line="Address = 10.9.0.1/24, fddd:9090:9090:9090::1/64"
+			wg_postup_ip6="; ip6tables -t nat -A POSTROUTING -s fddd:9090:9090:9090::/64 ! -d fddd:9090:9090:9090::/64 -j SNAT --to $ip6; ip6tables -I FORWARD -s fddd:9090:9090:9090::/64 -j ACCEPT; ip6tables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT"
+			wg_postdown_ip6="; ip6tables -t nat -D POSTROUTING -s fddd:9090:9090:9090::/64 ! -d fddd:9090:9090:9090::/64 -j SNAT --to $ip6; ip6tables -D FORWARD -s fddd:9090:9090:9090::/64 -j ACCEPT; ip6tables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT"
+		else
+			wg_addr_line="Address = 10.9.0.1/24"
+			wg_postup_ip6=""
+			wg_postdown_ip6=""
+		fi
+
 		# Generate server wg0.conf
 		echo "# ENDPOINT $wg_endpoint
 [Interface]
-Address = 10.9.0.1/24
+$wg_addr_line
 ListenPort = $wg_port
 PrivateKey = $server_private
-PostUp = iptables -t nat -A POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNAT --to $ip; iptables -I INPUT -p udp --dport $wg_port -j ACCEPT; iptables -I FORWARD -s 10.9.0.0/24 -j ACCEPT; iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNAT --to $ip; iptables -D INPUT -p udp --dport $wg_port -j ACCEPT; iptables -D FORWARD -s 10.9.0.0/24 -j ACCEPT; iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" > /etc/wireguard/wg0.conf
+PostUp = iptables -t nat -A POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNAT --to $ip; iptables -I INPUT -p udp --dport $wg_port -j ACCEPT; iptables -I FORWARD -s 10.9.0.0/24 -j ACCEPT; iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT$wg_postup_ip6
+PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNAT --to $ip; iptables -D INPUT -p udp --dport $wg_port -j ACCEPT; iptables -D FORWARD -s 10.9.0.0/24 -j ACCEPT; iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT$wg_postdown_ip6" > /etc/wireguard/wg0.conf
 		chmod 600 /etc/wireguard/wg0.conf
 
 		# Enable IP forwarding
@@ -710,6 +754,27 @@ PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNA
 			echo "echo 1 > /proc/sys/net/ipv4/ip_forward" >> /etc/rc.d/rc.local
 		fi
 		echo 1 > /proc/sys/net/ipv4/ip_forward
+		if [[ -n "$ip6" ]]; then
+			if ! grep -q "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" "/etc/rc.d/rc.local"; then
+				echo "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" >> /etc/rc.d/rc.local
+			fi
+			echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+		fi
+
+		# Save iptables rules and restore on boot
+        mkdir -p /etc/iptables/
+		iptables-save > /etc/iptables/rules.v4
+		if [[ -n "$ip6" ]]; then
+			ip6tables-save > /etc/iptables/rules.v6
+		fi
+		if ! grep -q "iptables-restore < /etc/iptables/rules.v4" "/etc/rc.d/rc.local"; then
+			echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.d/rc.local
+		fi
+		if [[ -n "$ip6" ]]; then
+			if ! grep -q "ip6tables-restore < /etc/iptables/rules.v6" "/etc/rc.d/rc.local"; then
+				echo "ip6tables-restore < /etc/iptables/rules.v6" >> /etc/rc.d/rc.local
+			fi
+		fi
 
 		# Start WireGuard and enable on boot
 		wg-quick up wg0
@@ -745,7 +810,7 @@ PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNA
 				echo "Provide a name for the client:"
 				read -p "Name: " unsanitized_wg_client
 				wg_client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_wg_client")
-				while [[ -z "$wg_client" || grep -q "# $wg_client$" /etc/wireguard/wg0.conf 2>/dev/null ]]; do
+				while [[ -z "$wg_client" ]] || grep -q "# $wg_client$" /etc/wireguard/wg0.conf 2>/dev/null; do
 					echo "$wg_client: invalid name or already exists."
 					read -p "Name: " unsanitized_wg_client
 					wg_client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_wg_client")
@@ -815,6 +880,15 @@ PostDown = iptables -t nat -D POSTROUTING -s 10.9.0.0/24 ! -d 10.9.0.0/24 -j SNA
 					fi
 					if grep -q "echo 1 > /proc/sys/net/ipv4/ip_forward" "/etc/rc.d/rc.local"; then
 						echo "$(grep -v "echo 1 > /proc/sys/net/ipv4/ip_forward" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+					fi
+					if grep -q "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" "/etc/rc.d/rc.local"; then
+						echo "$(grep -v "echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+					fi
+					if grep -q "iptables-restore < /etc/iptables/rules.v4" "/etc/rc.d/rc.local"; then
+						echo "$(grep -v "iptables-restore < /etc/iptables/rules.v4" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
+					fi
+					if grep -q "ip6tables-restore < /etc/iptables/rules.v6" "/etc/rc.d/rc.local"; then
+						echo "$(grep -v "ip6tables-restore < /etc/iptables/rules.v6" /etc/rc.d/rc.local)" > /etc/rc.d/rc.local
 					fi
 					removepkg wireguard-tools
 					rm -rf /etc/wireguard
