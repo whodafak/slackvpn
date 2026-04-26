@@ -19,7 +19,7 @@ as root
 
 And follow the screen.
    
-   When script is done, you can run it again to add/remove users or uninstall OpenVPN / WireGuard
+   When the script is done, you can run it again to add/remove users or uninstall OpenVPN / WireGuard
 
 # Iptables
 
