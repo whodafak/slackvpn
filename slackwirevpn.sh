@@ -152,37 +152,76 @@ wireguard_installed=0
 [[ -e /etc/wireguard/wg0.conf ]] && wireguard_installed=1
 
 if [[ "$openvpn_installed" -eq 0 && "$wireguard_installed" -eq 0 ]]; then
-	# Fresh install — ask which VPN to install
-	clear
-	echo "Welcome to the Slackware VPN installer!"
-	echo
-	echo "Which VPN would you like to install?"
-	echo "   1) OpenVPN"
-	echo "   2) WireGuard"
-	read -p "VPN [1]: " vpn_choice
-	until [[ -z "$vpn_choice" || "$vpn_choice" =~ ^[12]$ ]]; do
-		echo "$vpn_choice: invalid selection."
-		read -p "VPN [1]: " vpn_choice
-	done
-	[[ -z "$vpn_choice" ]] && vpn_choice="1"
+        # Fresh install — ask which VPN to install
+        clear
+        echo "Welcome to the Slackware VPN installer!"
+        echo
+        echo "Which VPN would you like to install?"
+        echo "   1) OpenVPN"
+        echo "   2) WireGuard"
+        read -p "VPN [1]: " vpn_choice
+        until [[ -z "$vpn_choice" || "$vpn_choice" =~ ^[12]$ ]]; do
+                echo "$vpn_choice: invalid selection."
+                read -p "VPN [1]: " vpn_choice
+        done
+        [[ -z "$vpn_choice" ]] && vpn_choice="1"
+
 elif [[ "$openvpn_installed" -eq 1 && "$wireguard_installed" -eq 0 ]]; then
-	vpn_choice="1"
+        # Only OpenVPN is installed — ask to manage or install WireGuard
+        clear
+        echo "OpenVPN is already installed."
+        echo
+        echo "What would you like to do?"
+        echo "   1) Manage OpenVPN"
+        echo "   2) Install WireGuard"
+        read -p "Option [1]: " single_choice
+        until [[ -z "$single_choice" || "$single_choice" =~ ^[12]$ ]]; do
+                echo "$single_choice: invalid selection."
+                read -p "Option [1]: " single_choice
+        done
+        [[ -z "$single_choice" ]] && single_choice="1"
+        if [[ "$single_choice" -eq 1 ]]; then
+                vpn_choice="1"
+        else
+                vpn_choice="2"
+                openvpn_installed=0   # treat as fresh WireGuard install
+        fi
+
 elif [[ "$openvpn_installed" -eq 0 && "$wireguard_installed" -eq 1 ]]; then
-	vpn_choice="2"
+        # Only WireGuard is installed — ask to manage or install OpenVPN
+        clear
+        echo "WireGuard is already installed."
+        echo
+        echo "What would you like to do?"
+        echo "   1) Manage WireGuard"
+        echo "   2) Install OpenVPN"
+        read -p "Option [1]: " single_choice
+        until [[ -z "$single_choice" || "$single_choice" =~ ^[12]$ ]]; do
+                echo "$single_choice: invalid selection."
+                read -p "Option [1]: " single_choice
+        done
+        [[ -z "$single_choice" ]] && single_choice="1"
+        if [[ "$single_choice" -eq 1 ]]; then
+                vpn_choice="2"
+        else
+                vpn_choice="1"
+                wireguard_installed=0   # treat as fresh OpenVPN install
+        fi
+
 else
-	# Both installed — ask which to manage
-	clear
-	echo "Both OpenVPN and WireGuard are installed."
-	echo
-	echo "Which VPN would you like to manage?"
-	echo "   1) OpenVPN"
-	echo "   2) WireGuard"
-	read -p "VPN [1]: " vpn_choice
-	until [[ -z "$vpn_choice" || "$vpn_choice" =~ ^[12]$ ]]; do
-		echo "$vpn_choice: invalid selection."
-		read -p "VPN [1]: " vpn_choice
-	done
-	[[ -z "$vpn_choice" ]] && vpn_choice="1"
+        # Both installed — ask which to manage
+        clear
+        echo "Both OpenVPN and WireGuard are installed."
+        echo
+        echo "Which VPN would you like to manage?"
+        echo "   1) OpenVPN"
+        echo "   2) WireGuard"
+        read -p "VPN [1]: " vpn_choice
+        until [[ -z "$vpn_choice" || "$vpn_choice" =~ ^[12]$ ]]; do
+                echo "$vpn_choice: invalid selection."
+                read -p "VPN [1]: " vpn_choice
+        done
+        [[ -z "$vpn_choice" ]] && vpn_choice="1"
 fi
 
 # ============================================================
